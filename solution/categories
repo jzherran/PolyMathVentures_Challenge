@@ -21,6 +21,7 @@ def execute_categories_challenge():
 
 def execute_rebuild():
     """This func bla bla bla."""
+    print
 
 def execute_render(id_category):
     """This func bla bla bla."""
