@@ -2,6 +2,7 @@
 
 """This module bla bla bla."""
 import sys
+import subprocess
 
 def execute_categories_challenge():
     """This func bla bla bla."""
@@ -21,7 +22,8 @@ def execute_categories_challenge():
 
 def execute_rebuild():
     """This func bla bla bla."""
-    print
+    file_tmp = open("temp_download.xml", "w")
+    subprocess.call(['../get_ebay_categories.sh'], stdout=file_tmp)
 
 def execute_render(id_category):
     """This func bla bla bla."""
