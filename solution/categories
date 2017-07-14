@@ -1,12 +1,29 @@
 #!/usr/bin/python
 
 """This module bla bla bla."""
-import category
+import sys
 
 def execute_categories_challenge():
     """This func bla bla bla."""
-    print "Start challenge for Palymath Ventures"
-    cat = category.Category(1)
-    print cat
+    arguments = sys.argv
+    if len(arguments) > 1:
+        action = arguments[1]
+        if action == "":
+            pass
+        elif action == "--rebuild":
+            execute_rebuild()
+        elif action == "--render":
+            try:
+                category = arguments[2]
+                execute_render(int(category))
+            except (ValueError, IndexError) as _:
+                pass
+
+def execute_rebuild():
+    """This func bla bla bla."""
+
+def execute_render(id_category):
+    """This func bla bla bla."""
+    print "Category # : ", id_category
 
 execute_categories_challenge()
