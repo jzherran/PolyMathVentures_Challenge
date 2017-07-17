@@ -1,32 +1,106 @@
 #!/usr/bin/python
 
 """This module bla bla bla."""
+import os
 import sys
+import sqlite3
+from sqlite3 import Error
 import subprocess
+import xml.etree.ElementTree as ET
 
 def execute_categories_challenge():
     """This func bla bla bla."""
-    arguments = sys.argv
-    if len(arguments) > 1:
-        action = arguments[1]
-        if action == "":
-            pass
-        elif action == "--rebuild":
-            execute_rebuild()
-        elif action == "--render":
-            try:
-                category = arguments[2]
-                execute_render(int(category))
-            except (ValueError, IndexError) as _:
+    database = "ebay_data.db"
+    conn = create_connection(database)
+    with conn:
+        arguments = sys.argv
+        if len(arguments) > 1:
+            action = arguments[1]
+            if action == "":
                 pass
+            elif action == "--rebuild":
+                execute_rebuild(conn)
+            elif action == "--render":
+                try:
+                    category = arguments[2]
+                    execute_render(conn, int(category))
+                except (ValueError, IndexError) as _:
+                    print "No category with ID: ", category
 
-def execute_rebuild():
+def execute_rebuild(conn):
     """This func bla bla bla."""
     file_tmp = open("temp_download.xml", "w")
     subprocess.call(['../get_ebay_categories.sh'], stdout=file_tmp)
+    cur = conn.cursor()
+    cur.execute('''DROP TABLE IF EXISTS CATEGORY''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS CATEGORY
+                (ID INT PRIMARY KEY NOT NULL,
+                NAME    TEXT    NOT NULL,
+                LEVEL   INT NOT NULL,
+                BEST_OFFER  BOOLEAN,
+                PARENT  INT);''')
+    conn.commit()
+    tree = ET.parse('temp_download.xml')
+    root = tree.getroot()
+    for category in root.iter('{urn:ebay:apis:eBLBaseComponents}Category'):
+        identifier = category.find('{urn:ebay:apis:eBLBaseComponents}CategoryID').text
+        name = category.find('{urn:ebay:apis:eBLBaseComponents}CategoryName').text
+        level = category.find('{urn:ebay:apis:eBLBaseComponents}CategoryLevel').text
+        best_offer = category.find('{urn:ebay:apis:eBLBaseComponents}BestOfferEnabled')
+        parent = category.find('{urn:ebay:apis:eBLBaseComponents}CategoryParentID').text
+        if best_offer != None:
+            best_offer = best_offer.text
+        print name, "-", identifier, "-", level, "-", best_offer, "-", parent
+        conn.execute("INSERT INTO CATEGORY (ID, NAME, LEVEL, BEST_OFFER, PARENT) \
+        VALUES (?, ?, ?, ?, ?)", (identifier, name, level, best_offer, parent))
+    os.remove('temp_download.xml')
 
-def execute_render(id_category):
+def execute_render(conn, id_category):
     """This func bla bla bla."""
-    print "Category # : ", id_category
+    cur = conn.cursor()
+    query_tree = " SELECT * FROM ( \
+                SELECT * \
+                FROM CATEGORY \
+                WHERE PARENT = ?1 \
+                UNION \
+                SELECT * \
+                FROM CATEGORY \
+                WHERE PARENT IN \
+                    (SELECT ID FROM CATEGORY WHERE PARENT = ?1) \
+                ) ORDER BY LEVEL"
+    cur.execute(query_tree, (id_category, ))
+    rows = cur.fetchall()
+    if rows.count > 0:
+        with open("renders/"+str(id_category)+".html", "w+") as html:
+            html.write("<html><body><ul>")
+            curr_lvl = last_lvl = 1
+            for row in rows:
+                print row
+                curr_lvl = int(row[2])
+                if curr_lvl > last_lvl:
+                    html.write("<ul>")
+                if curr_lvl >= last_lvl:
+                    last_lvl = curr_lvl
+                html.write("<li>"+str(row[0])+"</li>")
+            for _ in range(0, (last_lvl-1)):
+                html.write("</ul>")
+            html.write("</ul></body></html>")
+            html.close()
+    else:
+        print "No category with ID: ", id_category
 
-execute_categories_challenge()
+def create_connection(db_file):
+    """Create a database connection to the SQLite database
+        specified by the db_file
+    :param db_file: database file
+    :return: Connection object or None
+    """
+    try:
+        conn = sqlite3.connect(db_file)
+        return conn
+    except Error as error:
+        print error
+    return None
+
+if __name__ == "__main__":
+    execute_categories_challenge()
